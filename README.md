@@ -23,3 +23,7 @@ Never commit private keys or certificates (see `.gitignore`).
 
 ## Code Analyzer and Java
 PMD, CPD and the flow engine need Java 11+ on the PATH (`java -version`). Verified with Temurin 25 and Code Analyzer 5.11.0.
+
+## Pipeline
+
+Every pull request into `main` runs the `traceability` and `code-analyzer` gates.

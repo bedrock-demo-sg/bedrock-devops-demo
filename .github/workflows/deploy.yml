@@ -1,0 +1,47 @@
+name: Deploy
+on:
+  push:
+    branches: [integration, main]
+permissions:
+  contents: read
+concurrency:
+  # One deployment per target org at a time; a newer merge waits instead of cancelling a running deploy.
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    # integration -> SIT (automatic). main -> production stand-in (waits for approval on production-sim).
+    environment:
+      name: ${{ github.ref_name == 'main' && 'production-sim' || 'sit' }}
+      url: ${{ steps.login.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Install Salesforce CLI
+        run: npm install --global @salesforce/cli && sf --version
+      - name: Log in with the CI certificate (JWT)
+        id: login
+        env:
+          SF_JWT_KEY: ${{ secrets.SF_JWT_KEY }}
+        run: |
+          echo "$SF_JWT_KEY" > "$RUNNER_TEMP/server.key"
+          sf org login jwt --client-id "${{ secrets.SF_CLIENT_ID }}" --jwt-key-file "$RUNNER_TEMP/server.key" \
+            --username "${{ secrets.SF_USERNAME }}" --instance-url "${{ secrets.SF_INSTANCE_URL }}" --alias target
+          rm "$RUNNER_TEMP/server.key"
+          echo "url=${{ secrets.SF_INSTANCE_URL }}" >> "$GITHUB_OUTPUT"
+      - name: Deploy and run Apex tests
+        run: |
+          sf project deploy start --source-dir force-app --target-org target \
+            --test-level RunSpecifiedTests --tests ClientReviewServiceTest \
+            --coverage-formatters text --results-dir deploy-results --wait 30
+      - name: Assign the Client Review Manager permission set to the integration user
+        run: sf org assign permset --name Client_Review_Manager --target-org target || echo "Already assigned"
+      - name: Keep the deployment results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-results-${{ github.ref_name }}
+          path: deploy-results

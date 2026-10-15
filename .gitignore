@@ -1,0 +1,18 @@
+# Salesforce CLI local state
+.sf/
+.sfdx/
+.localdevserver/
+# Node
+node_modules/
+# Secrets - never commit
+*.key
+server.key
+*.pem
+*.crt
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+# Code Analyzer output
+code-analyzer-results.*
+*.sarif

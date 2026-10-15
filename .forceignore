@@ -1,0 +1,13 @@
+# List files or directories below to ignore them when running force:source:push, force:source:pull, and force:source:status
+package.xml
+**/*.dup
+**/.eslintrc.json
+**/jsconfig.json
+**/tsconfig.json
+**/__tests__/**
+**/node_modules/**
+**/.sfdx/**
+**/.sf/**
+# Profiles are managed through permission sets in this repo
+**/profiles/**
+**/jsconfig.json

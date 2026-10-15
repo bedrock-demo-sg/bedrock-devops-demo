@@ -1,0 +1,55 @@
+# Quality gates on every pull request into main. All jobs must pass before merge (branch protection).
+name: PR validation
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  traceability:
+    name: traceability
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull request title carries a work item key (for example W-1234)
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if [[ "$TITLE" =~ ^W-[0-9]+[[:space:]] ]]; then
+            echo "OK: $TITLE"
+          else
+            echo "::error title=Missing work item key::Start the pull request title with a work item key, for example 'W-1234 Add Client Review object'."
+            exit 1
+          fi
+
+  code-analyzer:
+    name: code-analyzer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install Salesforce CLI and Code Analyzer
+        run: |
+          npm install --global @salesforce/cli
+          sf plugins install @salesforce/plugin-code-analyzer
+          sf --version
+      - name: Static analysis (fails on Critical or High)
+        run: |
+          sf code-analyzer run --config-file code-analyzer.yml --target force-app \
+            --severity-threshold 2 --view table \
+            --output-file code-analyzer-results.html --output-file code-analyzer-results.sarif
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-analyzer-results
+          path: code-analyzer-results.*

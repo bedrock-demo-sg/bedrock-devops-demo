@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <actionCalls>
+        <name>Set_Next_Review_Date</name>
+        <label>Set Next Review Date</label>
+        <locationX>176</locationX>
+        <locationY>458</locationY>
+        <actionName>ClientReviewService</actionName>
+        <actionType>apex</actionType>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>reviewId</name>
+            <value><elementReference>$Record.Id</elementReference></value>
+        </inputParameters>
+        <nameSegment>ClientReviewService</nameSegment>
+        <versionSegment>1</versionSegment>
+    </actionCalls>
+    <apiVersion>68.0</apiVersion>
+    <decisions>
+        <name>Status_Is_Blank</name>
+        <label>Status Is Blank</label>
+        <locationX>176</locationX>
+        <locationY>323</locationY>
+        <defaultConnector><targetReference>Set_Next_Review_Date</targetReference></defaultConnector>
+        <defaultConnectorLabel>Status Set</defaultConnectorLabel>
+        <rules>
+            <name>Blank</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>$Record.Status__c</leftValueReference>
+                <operator>IsBlank</operator>
+                <rightValue><booleanValue>true</booleanValue></rightValue>
+            </conditions>
+            <connector><targetReference>Set_Status_Scheduled</targetReference></connector>
+            <label>Blank</label>
+        </rules>
+    </decisions>
+    <description>After create: default Status to Scheduled, then set Next Review Date via Apex.</description>
+    <environments>Default</environments>
+    <interviewLabel>Client Review Created {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Client Review Created</label>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value><stringValue>LightningFlowBuilder</stringValue></value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value><stringValue>AUTO_LAYOUT_CANVAS</stringValue></value>
+    </processMetadataValues>
+    <processType>AutoLaunchedFlow</processType>
+    <recordUpdates>
+        <name>Set_Status_Scheduled</name>
+        <label>Set Status Scheduled</label>
+        <locationX>44</locationX>
+        <locationY>431</locationY>
+        <connector><targetReference>Set_Next_Review_Date</targetReference></connector>
+        <inputAssignments>
+            <field>Status__c</field>
+            <value><stringValue>Scheduled</stringValue></value>
+        </inputAssignments>
+        <inputReference>$Record</inputReference>
+    </recordUpdates>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector><targetReference>Status_Is_Blank</targetReference></connector>
+        <object>Client_Review__c</object>
+        <recordTriggerType>Create</recordTriggerType>
+        <triggerType>RecordAfterSave</triggerType>
+    </start>
+    <status>Active</status>
+</Flow>

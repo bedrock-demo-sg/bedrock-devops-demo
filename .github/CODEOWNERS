@@ -1,4 +1,1 @@
-# Placeholder owner - replace @OWNER with a real user or team before enabling branch protection
-* @OWNER
-/force-app/main/default/permissionsets/ @OWNER
-/.github/ @OWNER
+* @bedrock-demo-sg

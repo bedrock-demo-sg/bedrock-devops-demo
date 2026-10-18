@@ -40,82 +40,84 @@ private class ClientReviewServiceTest {
         Assert.areEqual(Date.newInstance(2027, 1, 15), ClientReviewService.calculateNextReviewDate(d, null));
     }
 
+    // Each test runs as a user holding only the Client_Review_Manager permission set, so the
+    // result doesn't depend on the deploying admin's field access in the target org.
     @IsTest
     static void flowSetsStatusAndNextReviewDate() {
-        Account a = new Account(Name = 'Flow Test Client');
-        insert a;
-        Date d = Date.newInstance(2026, 3, 31);
-        List<Client_Review__c> reviews = new List<Client_Review__c>{
-            newReview(a.Id, d, 'Growth'),
-            newReview(a.Id, d, 'Balanced'),
-            newReview(a.Id, d, 'Conservative')
-        };
         System.runAs(makeUser()) {
+            Account a = new Account(Name = 'Flow Test Client');
+            insert a;
+            Date d = Date.newInstance(2026, 3, 31);
+            List<Client_Review__c> reviews = new List<Client_Review__c>{
+                newReview(a.Id, d, 'Growth'),
+                newReview(a.Id, d, 'Balanced'),
+                newReview(a.Id, d, 'Conservative')
+            };
             Test.startTest();
             insert reviews;
             Test.stopTest();
-        }
-        Map<Id, Client_Review__c> byId = new Map<Id, Client_Review__c>([
-            SELECT Id, Risk_Profile__c, Status__c, Next_Review_Date__c FROM Client_Review__c
-        ]);
-        Assert.areEqual(3, byId.size());
-        for (Client_Review__c cr : byId.values()) {
-            Assert.areEqual('Scheduled', cr.Status__c, 'Flow should default Status to Scheduled');
-            Date expected = cr.Risk_Profile__c == 'Growth' ? Date.newInstance(2026, 9, 30) : Date.newInstance(2027, 3, 31);
-            Assert.areEqual(expected, cr.Next_Review_Date__c, 'Wrong date for ' + cr.Risk_Profile__c);
+            Map<Id, Client_Review__c> byId = new Map<Id, Client_Review__c>([
+                SELECT Id, Risk_Profile__c, Status__c, Next_Review_Date__c FROM Client_Review__c
+            ]);
+            Assert.areEqual(3, byId.size());
+            for (Client_Review__c cr : byId.values()) {
+                Assert.areEqual('Scheduled', cr.Status__c, 'Flow should default Status to Scheduled');
+                Date expected = cr.Risk_Profile__c == 'Growth' ? Date.newInstance(2026, 9, 30) : Date.newInstance(2027, 3, 31);
+                Assert.areEqual(expected, cr.Next_Review_Date__c, 'Wrong date for ' + cr.Risk_Profile__c);
+            }
         }
     }
 
     @IsTest
     static void flowKeepsExplicitStatus() {
-        Account a = new Account(Name = 'Status Client');
-        insert a;
-        Client_Review__c cr = newReview(a.Id, Date.newInstance(2026, 2, 1), 'Balanced');
-        cr.Status__c = 'Draft';
         System.runAs(makeUser()) {
+            Account a = new Account(Name = 'Status Client');
+            insert a;
+            Client_Review__c cr = newReview(a.Id, Date.newInstance(2026, 2, 1), 'Balanced');
+            cr.Status__c = 'Draft';
             insert cr;
+            cr = [SELECT Status__c FROM Client_Review__c WHERE Id = :cr.Id];
+            Assert.areEqual('Draft', cr.Status__c);
         }
-        cr = [SELECT Status__c FROM Client_Review__c WHERE Id = :cr.Id];
-        Assert.areEqual('Draft', cr.Status__c);
     }
 
     @IsTest
     static void nullReviewDateIsSkipped() {
-        Account a = new Account(Name = 'Null Date Client');
-        insert a;
-        Client_Review__c cr = newReview(a.Id, null, 'Growth');
         System.runAs(makeUser()) {
+            Account a = new Account(Name = 'Null Date Client');
+            insert a;
+            Client_Review__c cr = newReview(a.Id, null, 'Growth');
             insert cr;
             ClientReviewService.Request req = new ClientReviewService.Request();
             req.reviewId = cr.Id;
             ClientReviewService.setNextReviewDate(new List<ClientReviewService.Request>{ req });
+            cr = [SELECT Next_Review_Date__c, Status__c FROM Client_Review__c WHERE Id = :cr.Id];
+            Assert.isNull(cr.Next_Review_Date__c);
+            Assert.areEqual('Scheduled', cr.Status__c);
         }
-        cr = [SELECT Next_Review_Date__c, Status__c FROM Client_Review__c WHERE Id = :cr.Id];
-        Assert.isNull(cr.Next_Review_Date__c);
-        Assert.areEqual('Scheduled', cr.Status__c);
     }
 
     @IsTest
     static void bulkOf200() {
-        Account a = new Account(Name = 'Bulk Client');
-        insert a;
-        List<Client_Review__c> reviews = new List<Client_Review__c>();
-        String[] risks = new String[]{ 'Conservative', 'Balanced', 'Growth' };
-        for (Integer i = 0; i < 200; i++) {
-            reviews.add(newReview(a.Id, Date.newInstance(2026, 1, 10), risks[Math.mod(i, 3)]));
-        }
         System.runAs(makeUser()) {
+            Account a = new Account(Name = 'Bulk Client');
+            insert a;
+            List<Client_Review__c> reviews = new List<Client_Review__c>();
+            String[] risks = new String[]{ 'Conservative', 'Balanced', 'Growth' };
+            for (Integer i = 0; i < 200; i++) {
+                reviews.add(newReview(a.Id, Date.newInstance(2026, 1, 10), risks[Math.mod(i, 3)]));
+            }
             Test.startTest();
             insert reviews;
             Test.stopTest();
+            Integer populated = 0;
+            for (Client_Review__c cr : [SELECT Risk_Profile__c, Status__c, Next_Review_Date__c FROM Client_Review__c]) {
+                Date expected = cr.Risk_Profile__c == 'Growth' ? Date.newInstance(2026, 7, 10) : Date.newInstance(2027, 1, 10);
+                Assert.areEqual(expected, cr.Next_Review_Date__c);
+                Assert.areEqual('Scheduled', cr.Status__c);
+                populated++;
+            }
+            Assert.areEqual(200, populated);
         }
-        Integer populated = 0;
-        for (Client_Review__c cr : [SELECT Risk_Profile__c, Status__c, Next_Review_Date__c FROM Client_Review__c]) {
-            Date expected = cr.Risk_Profile__c == 'Growth' ? Date.newInstance(2026, 7, 10) : Date.newInstance(2027, 1, 10);
-            Assert.areEqual(expected, cr.Next_Review_Date__c);
-            Assert.areEqual('Scheduled', cr.Status__c);
-            populated++;
-        }
-        Assert.areEqual(200, populated);
     }
 }

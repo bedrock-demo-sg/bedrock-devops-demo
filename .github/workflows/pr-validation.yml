@@ -1,30 +1,14 @@
-# Quality gates on every pull request into main. All jobs must pass before merge (branch protection).
+# Quality checks on every pull request into main. Both must pass before merge (branch protection).
 name: PR validation
 
 on:
   pull_request:
     branches: [main]
-    types: [opened, edited, synchronize, reopened]
 
 permissions:
   contents: read
 
 jobs:
-  traceability:
-    name: traceability
-    runs-on: ubuntu-latest
-    steps:
-      - name: Pull request title carries a work item key (for example W-1234)
-        env:
-          TITLE: ${{ github.event.pull_request.title }}
-        run: |
-          if [[ "$TITLE" =~ ^W-[0-9]+[[:space:]] ]]; then
-            echo "OK: $TITLE"
-          else
-            echo "::error title=Missing work item key::Start the pull request title with a work item key, for example 'W-1234 Add Client Review object'."
-            exit 1
-          fi
-
   code-analyzer:
     name: code-analyzer
     runs-on: ubuntu-latest
@@ -53,3 +37,33 @@ jobs:
         with:
           name: code-analyzer-results
           path: code-analyzer-results.*
+
+  validate:
+    name: validate
+    needs: code-analyzer
+    runs-on: ubuntu-latest
+    # Dry run against production: proves the change deploys and the Apex tests pass, without changing the org.
+    environment: prod-validate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Install Salesforce CLI
+        run: npm install --global @salesforce/cli && sf --version
+      - name: Log in with the CI certificate (JWT)
+        env:
+          SF_JWT_KEY: ${{ secrets.SF_JWT_KEY }}
+        run: |
+          echo "$SF_JWT_KEY" > "$RUNNER_TEMP/server.key"
+          sf org login jwt --client-id "${{ secrets.SF_CLIENT_ID }}" --jwt-key-file "$RUNNER_TEMP/server.key" \
+            --username "${{ secrets.SF_USERNAME }}" --instance-url "${{ secrets.SF_INSTANCE_URL }}" --alias target
+          rm "$RUNNER_TEMP/server.key"
+      - name: Validate deployment and run Apex tests (no changes made to the org)
+        run: |
+          sf project deploy validate --source-dir force-app --target-org target \
+            --test-level RunSpecifiedTests --tests ClientReviewServiceTest \
+            --coverage-formatters text --results-dir deploy-results --wait 30
+      - name: Keep the test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: validate-results, path: deploy-results }

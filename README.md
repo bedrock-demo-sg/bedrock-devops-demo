@@ -9,6 +9,8 @@ Small Salesforce DX project used to demo a source-driven development lifecycle: 
 - `permissionsets/Client_Review_Manager` - object, field, class and tab access
 - `code-analyzer.yml` - Code Analyzer v5 rule configuration
 - `demo-assets/` - not deployed; patch files for the deliberate failing-scan demo
+- `.github/workflows/pr-validation.yml` - pull request checks into `main`: Code Analyzer, then a validation deploy with Apex tests against production
+- `.github/workflows/deploy.yml` - every merge to `main` deploys to production and runs the Apex tests
 - `.github/` - CODEOWNERS and PR template
 
 ## Run locally

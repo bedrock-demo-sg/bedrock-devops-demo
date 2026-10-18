@@ -5,7 +5,6 @@
 W-XXXX
 
 ## Checklist
-- [ ] PR title starts with the Jira key (W-1234)
 - [ ] Apex tests added or updated and passing
 - [ ] Code Analyzer is clean at severity threshold 2
 - [ ] Permission sets updated for any new object, field, class or flow access
